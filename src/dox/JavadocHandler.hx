@@ -1,4 +1,5 @@
 package dox;
+using StringTools;
 
 class JavadocHandler {
 
@@ -12,34 +13,84 @@ class JavadocHandler {
 		markdown = mdown;
 	}
 
-	public function parse(path:String, doc:String):DocInfos
-	{
-		var tags = [];
-		// TODO: need to parse this better as haxe source might have this sort of meta
-		var ereg = ~/^@(param|default|exception|throws|deprecated|return|returns|since)\s+([^@]+)/gm;
+	static inline function isValidChar(c) {
+		return (c >= 'a'.code && c <= 'z'.code) || (c >= 'A'.code && c <= 'Z'.code) || (c >= '0'.code && c <= '9'.code) || c == '_'.code;
+	}
 
-		doc = ereg.map(doc, function(e){
-			var name = e.matched(1);
-			var doc = e.matched(2);
-			var value = null;
-
-			switch (name)
-			{
-				case 'param', 'exception', 'throws':
-					var ereg = ~/([^\s]+)\s+(.*)/gs;
-					if (ereg.match(doc))
-					{
-						value = ereg.matched(1);
-						doc = ereg.matched(2);
-					}
-				default:
+	public function parse(path:String, doc:String):DocInfos {
+		var onNewLine = true;
+		var i = 0;
+		function readWord() {
+			var buf = new StringBuf();
+			while (true) {
+				var c = doc.fastCodeAt(i++);
+				if (!isValidChar(c)) {
+					return buf.toString();
+				} else {
+					buf.addChar(c);
+				}
 			}
-			doc = trimDoc(doc);
-			tags.push({name:name, doc:markdown.markdownToHtml(path, doc), value:value});
-			return '';
-		});
+		}
+		function skipSpaces() {
+			while (true) {
+				var c = doc.fastCodeAt(i);
+				switch (c) {
+					case ' '.code, '\t'.code:
+						++i;
+					case _:
+						return;
+				}
+			}
+		}
+		var mainDoc = null;
+		var currentTag:DocTag = null;
+		var tags = [];
+		var buf = new StringBuf();
+		function commitBuf() {
+			if (buf.length == 0) {
+				return;
+			}
+			var doc = markdown.markdownToHtml(path, buf.toString());
+			if (currentTag != null) {
+				currentTag.doc = doc;
+			} else {
+				mainDoc = doc;
+			}
+			buf = new StringBuf();
+		}
+		while (true) {
+			var c = doc.fastCodeAt(i++);
+			if (StringTools.isEof(c)) {
+				break;
+			}
+			switch (c) {
+				case '@'.code if (onNewLine):
+					commitBuf();
+					var name = readWord();
+					skipSpaces();
+					var value = switch (name) {
+						case "param" | "exception" | "throws":
+							readWord();
+						case _:
+							null;
+					}
+					currentTag = {
+						name: name,
+						value: value,
+						doc: "",
+					}
+					tags.push(currentTag);
+				case '\n'.code:
+					onNewLine = true;
+				case ' '.code, '\t'.code, '*'.code, '\r'.code, '\n'.code if (onNewLine):
 
-		var infos:DocInfos = {doc:markdown.markdownToHtml(path, doc), throws:[], params:[], tags:tags};
+				case _:
+					onNewLine = false;
+					buf.addChar(c);
+			}
+		}
+		commitBuf();
+		var infos:DocInfos = {doc:mainDoc, throws:[], params:[], tags:tags};
 		for (tag in tags) switch (tag.name)
 		{
 			case 'param': infos.params.push(tag);
