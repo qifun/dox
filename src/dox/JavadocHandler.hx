@@ -13,10 +13,6 @@ class JavadocHandler {
 		markdown = mdown;
 	}
 
-	static inline function isValidChar(c) {
-		return (c >= 'a'.code && c <= 'z'.code) || (c >= 'A'.code && c <= 'Z'.code) || (c >= '0'.code && c <= '9'.code) || c == '_'.code;
-	}
-
 	public function parse(path:String, doc:String):DocInfos {
 		var onNewLine = true;
 		var i = 0;
@@ -24,10 +20,9 @@ class JavadocHandler {
 			var buf = new StringBuf();
 			while (true) {
 				var c = doc.fastCodeAt(i++);
-				if (!isValidChar(c)) {
-					return buf.toString();
-				} else {
-					buf.addChar(c);
+				switch (c) {
+					case ' '.code, '\t'.code: return buf.toString();
+					case _: buf.addChar(c);
 				}
 			}
 		}
