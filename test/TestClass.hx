@@ -99,6 +99,11 @@ class TestClass
 	public function foo(x:Int):Void
 	{
 	}
+
+    /**
+      @throws com.qifun.jsonStream.JsonDeserializerError 反序列化时格式错误
+    **/
+	public function testThrows() { }
 }
 
 /**
